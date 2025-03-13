@@ -1,0 +1,10 @@
+cleaned/*
+paper/*
+mypaper/*
+ollamatest.py
+pdfclean.py
+apiclean.py
+apisummary.py
+paperclean.py
+example.pdf
+.DS_Store
