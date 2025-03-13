@@ -12,7 +12,7 @@ base_url = "https://api.siliconflow.cn/v1"
 ##### part includes: title+abstract+introduction+related work; method; experiment; conclusion; reference
 ##### the text should be divided into 5 parts, and the text should be cleaned
 
-def indentify_text_belong(pdf_path, workdir, api_key):
+def indentify_text_belong(pdf_path, workdir, api_key, base_url, model_for_clean):
     cleaned_prompt =  """
 我们将论文分为八个部分，分别是：
 1. 标题
@@ -45,8 +45,6 @@ def indentify_text_belong(pdf_path, workdir, api_key):
 {input_text}
 """
 
-    base_url = "https://api.siliconflow.cn/v1"
-
     client = OpenAI(
         base_url=base_url,
         api_key=api_key
@@ -70,7 +68,7 @@ def indentify_text_belong(pdf_path, workdir, api_key):
             continue
         text = page.extract_text()
         response = client.chat.completions.create(
-            model="Qwen/Qwen2.5-14B-Instruct",
+            model=model_for_clean,
             messages=[{'role': 'user', 'content': cleaned_prompt.format(last_result=last_result, input_text=text)}],
             stream=False,
             max_tokens=4096,
@@ -91,7 +89,7 @@ def indentify_text_belong(pdf_path, workdir, api_key):
                 f.write(last_result)
         idx += 1
     for i in range(idx):
-        print(workdir + '/text_belong_' + str(i) + '.json')
+        # print(workdir + '/text_belong_' + str(i) + '.json')
         tmp_results = json.load(open(workdir + '/text_belong_' + str(i) + '.json', 'r'))
         for key in tmp_results:
             if tmp_results[key] == '' or tmp_results[key] is None:
@@ -102,7 +100,7 @@ def indentify_text_belong(pdf_path, workdir, api_key):
                 results[key] += tmp_results[key]
     json.dump(results, open(workdir + '/text_belong.json', 'w'))
       
-def summary_each_chapter(json_path, workdir, api_key):
+def summary_each_chapter(json_path, workdir, api_key, base_url, model_for_summary):
     cleaned_prompt =  """
 我们提供了文章的{chapter}部分，需要你对这部分内容进行清理和总结，不应该丢失重要的公式、模型结构等细节
 对于标题内容，可能有大量重复，清理重复即可。
@@ -127,8 +125,6 @@ def summary_each_chapter(json_path, workdir, api_key):
 {input_text}
 """
 
-    base_url = "https://api.siliconflow.cn/v1"
-
     client = OpenAI(
         base_url=base_url,
         api_key=api_key
@@ -138,7 +134,7 @@ def summary_each_chapter(json_path, workdir, api_key):
     for key in cleaned_json:
         text = cleaned_json[key].encode('unicode_escape').decode('ascii') .encode('utf-8') 
         response = client.chat.completions.create(
-            model="deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+            model=model_for_summary,
             messages=[{'role': 'user', 'content': cleaned_prompt.format(chapter=key, input_text=text)}],
             stream=True,
             max_tokens=12384,
@@ -162,9 +158,13 @@ def summary_each_chapter(json_path, workdir, api_key):
 def argument_parser():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--config', type=str, default='./default_config.yaml', help='config file path')
+    parser.add_argument('--api_engine', type=str, help='api engine', choices=['openai'])
     parser.add_argument('--api_key', type=str, help='api key')
     parser.add_argument('--pdf', type=str, help='pdf file path')
     parser.add_argument('--workdir', type=str, help='work directory')
+    parser.add_argument('--model_for_clean', type=str, help='model for clean')
+    parser.add_argument('--model_for_summary', type=str, help='model for summary')
+    
     return parser.parse_args()
 
 # for pdf in os.listdir('paper/'):
@@ -181,6 +181,14 @@ def argument_parser():
 if __name__ == '__main__':
     args = argument_parser()
     config = yaml.load(open(args.config, 'r'),yaml.SafeLoader)
+    if args.api_key is None:
+        args.api_key = config['global']['api_key']
+    if args.api_engine == 'openai':
+        base_url = config['global']['openai']['base_url']
+    if args.model_for_clean is None:
+        args.model_for_clean = config['global']['model_for_clean']
+    if args.model_for_summary is None:
+        args.model_for_summary = config['global']['model_for_summary']
     os.makedirs(args.workdir, exist_ok=True)
-    indentify_text_belong(args.pdf, args.workdir, args.api_key)
-    summary_each_chapter(args.workdir + '/text_belong.json', args.workdir, args.api_key)
+    indentify_text_belong(args.pdf, args.workdir, args.api_key, base_url, args.model_for_clean)
+    summary_each_chapter(args.workdir + '/text_belong.json', args.workdir, args.api_key, base_url, args.model_for_summary)

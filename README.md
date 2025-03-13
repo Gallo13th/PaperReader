@@ -44,3 +44,10 @@ graph TD
     end
     Summarize --> Output
 ```
+
+
+### continue plan
+
+- [ ] Build a web service for this tool
+- [ ] Construct a knowledge database for papers, which supports search, recommendation, and projection design
+- [ ] Add more features for cleaning and summarizing
